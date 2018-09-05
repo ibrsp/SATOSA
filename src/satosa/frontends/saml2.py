@@ -11,11 +11,14 @@ from saml2 import SAMLError, xmldsig
 from saml2.config import IdPConfig
 from saml2.extension.ui import NAMESPACE as UI_NAMESPACE
 from saml2.metadata import create_metadata_string
-from saml2.saml import NameID, NAMEID_FORMAT_TRANSIENT, NAMEID_FORMAT_PERSISTENT
+from saml2.saml import NameID, NAMEID_FORMAT_TRANSIENT, \
+    NAMEID_FORMAT_PERSISTENT, NAMEID_FORMAT_EMAILADDRESS, \
+    NAMEID_FORMAT_UNSPECIFIED, NAMEID_FORMAT_UNSPECIFIED1
 from saml2.samlp import name_id_policy_from_string
 from saml2.server import Server
 
 from satosa.base import SAMLBaseModule
+from satosa.context import Context
 from .base import FrontendModule
 from ..internal_data import InternalRequest, UserIdHashType
 from ..logging_util import satosa_logging
@@ -39,6 +42,12 @@ def saml_name_id_format_to_hash_type(name_format):
     """
     if name_format == NAMEID_FORMAT_PERSISTENT:
         return UserIdHashType.persistent
+    elif name_format == NAMEID_FORMAT_EMAILADDRESS:
+        return UserIdHashType.emailaddress
+    elif name_format == NAMEID_FORMAT_UNSPECIFIED:
+        return UserIdHashType.unspecified
+    elif name_format == NAMEID_FORMAT_UNSPECIFIED1:
+        return UserIdHashType.unspecified_1
 
     return UserIdHashType.transient
 
@@ -56,6 +65,13 @@ def hash_type_to_saml_name_id_format(hash_type):
         return NAMEID_FORMAT_TRANSIENT
     elif hash_type is UserIdHashType.persistent:
         return NAMEID_FORMAT_PERSISTENT
+    elif hash_type is UserIdHashType.emailaddress:
+        return NAMEID_FORMAT_EMAILADDRESS
+    elif hash_type is UserIdHashType.unspecified:
+        return NAMEID_FORMAT_UNSPECIFIED
+    elif hash_type is UserIdHashType.unspecified_1:
+        return NAMEID_FORMAT_UNSPECIFIED1
+
     return NAMEID_FORMAT_PERSISTENT
 
 
@@ -253,6 +269,7 @@ class SAMLFrontend(FrontendModule, SAMLBaseModule):
 
     def _filter_attributes(self, idp, internal_response, context,):
         idp_policy = idp.config.getattr("policy", "idp")
+        attributes = {}
         if idp_policy:
             approved_attributes = self._get_approved_attributes(idp, idp_policy, internal_response.requester,
                                                                 context.state)
@@ -503,7 +520,7 @@ class SAMLMirrorFrontend(SAMLFrontend):
         :return: An idp server
         """
         target_entity_id = context.path.split("/")[1]
-        context.internal_data["mirror.target_entity_id"] = target_entity_id
+        context.decorate(Context.KEY_MIRROR_TARGET_ENTITYID, target_entity_id)
         idp_conf_file = self._load_endpoints_to_config(context.target_backend, target_entity_id)
         idp_config = IdPConfig().load(idp_conf_file, metadata_construction=False)
         return Server(config=idp_config)
